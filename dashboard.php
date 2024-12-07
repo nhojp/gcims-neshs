@@ -1,170 +1,236 @@
 <?php
-include 'conn.php';
-include 'head.php';
-include 'sidebar.php';
+session_start();
+ob_start();
 
-// Fetch reservations data
-$reservationsQuery = "SELECT `id`, `user_id`, `table_id`, `reservation_date`, `reservation_time`, `duration`, `total_price`, `status`, `payment_method` FROM `reservations` WHERE 1";
-$reservationsResult = mysqli_query($conn, $reservationsQuery);
+// Check if admin is logged in
+if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
+    header("Location: index.php");
+    exit;
+}
 
-// Fetch tables data
-$tablesQuery = "SELECT `id`, `table_name`, `seats` FROM `tables` WHERE 1";
-$tablesResult = mysqli_query($conn, $tablesQuery);
+include "head.php";
+include "sidebar.php";
+include "conn.php";
 
-// Fetch menu items data
-$menuItemsQuery = "SELECT `id`, `name`, `description`, `price`, `image` FROM `menu_items` WHERE 1";
-$menuItemsResult = mysqli_query($conn, $menuItemsQuery);
+// Filters
+$filter_section = isset($_GET['section']) ? $_GET['section'] : '';
+$filter_grade = isset($_GET['grade']) ? $_GET['grade'] : '';
 
-// Fetch bundle items data
-$bundleItemsQuery = "SELECT `id`, `bundle_id`, `item_id` FROM `bundle_items` WHERE 1";
-$bundleItemsResult = mysqli_query($conn, $bundleItemsQuery);
+// Complaints: Fetch the section with the most complaints
+$sql_section = "SELECT complainedSection, COUNT(*) as count 
+                FROM complaints_student 
+                GROUP BY complainedSection 
+                ORDER BY count DESC LIMIT 1";
+$result_section = $conn->query($sql_section);
+$most_complained_section = "";
+$most_complained_section_count = 0;
+if ($result_section->num_rows > 0) {
+    $section_data = $result_section->fetch_assoc();
+    $most_complained_section = $section_data['complainedSection'];
+    $most_complained_section_count = $section_data['count'];
+}
 
-// Fetch bundles data
-$bundlesQuery = "SELECT `id`, `name`, `price` FROM `bundles` WHERE 1";
-$bundlesResult = mysqli_query($conn, $bundlesQuery);
+// Complaints: Fetch the grade with the most complaints
+$sql_grade = "SELECT complainedGrade, COUNT(*) as count 
+              FROM complaints_student
+              GROUP BY complainedGrade 
+              ORDER BY count DESC LIMIT 1";
+$result_grade = $conn->query($sql_grade);
+$most_complained_grade = "";
+$most_complained_grade_count = 0;
+if ($result_grade->num_rows > 0) {
+    $grade_data = $result_grade->fetch_assoc();
+    $most_complained_grade = $grade_data['complainedGrade'];
+    $most_complained_grade_count = $grade_data['count'];
+}
+
+// Violation Summary: Fetch violation count based on filters
+$filter_query = "WHERE 1";
+if (!empty($filter_section)) {
+    $filter_query .= " AND vr.section = '" . $conn->real_escape_string($filter_section) . "'";
+}
+if (!empty($filter_grade)) {
+    $filter_query .= " AND vr.grade = '" . $conn->real_escape_string($filter_grade) . "'";
+}
+
+$sql_violation = "SELECT v.violation_description, COUNT(*) AS count 
+                  FROM violation_reported vr
+                  JOIN violation_list v ON vr.violation_description = v.id
+                  $filter_query
+                  GROUP BY v.violation_description 
+                  ORDER BY count DESC";
+$result_violation = $conn->query($sql_violation);
+
+$violations_data = [];
+$total_violations = 0;
+
+if ($result_violation->num_rows > 0) {
+    while ($row = $result_violation->fetch_assoc()) {
+        $violations_data[] = $row;
+        $total_violations += $row['count'];
+    }
+}
+
+// Fetch distinct sections and grades for the filter dropdowns
+$sections = $conn->query("SELECT DISTINCT section FROM violation_reported");
+$grades = $conn->query("SELECT DISTINCT grade FROM violation_reported");
+
+$conn->close();
+
 ?>
+<div id="main">
+    <?php include "header.php"; ?>
+    
+    <div class="container-fluid">
+        <div class="container-fluid bg-white mt-2 rounded-lg border">
+            <div class="row pt-3">
+                <div class="col-md-8">
+                    <div class="container-fluid pt-2">
+                        <h3><strong>Dashboard</strong></h3>
+                    </div>
+                </div>
+                <form method="get" class="col-md-4">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <select id="section" name="section" class="form-control" onchange="this.form.submit()">
+                                <option value="">All Sections</option>
+                                <?php while ($section = $sections->fetch_assoc()) : ?>
+                                    <option value="<?php echo htmlspecialchars($section['section']); ?>"
+                                        <?php echo ($filter_section == $section['section']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($section['section']); ?>
+                                    </option>
+                                <?php endwhile; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <select id="grade" name="grade" class="form-control" onchange="this.form.submit()">
+                                <option value="">All Grades</option>
+                                <?php while ($grade = $grades->fetch_assoc()) : ?>
+                                    <option value="<?php echo htmlspecialchars($grade['grade']); ?>"
+                                        <?php echo ($filter_grade == $grade['grade']) ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($grade['grade']); ?>
+                                    </option>
+                                <?php endwhile; ?>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-md-8">
+                    <canvas id="violationsChart"></canvas>
+                </div>
+                <div class="col-md-4">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card bg-success text-white text-center pt-5">
+                                <div class="card-body pb-5 ">
+                                    <h3>Total Violations</h3>
+                                    <h1><strong><?php echo $total_violations; ?></strong></h2>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-<div id="main" class="mb-5" style="margin-top:5%;">
-    <?php include "navbar-a.php"; ?>
+                    <div class="row pt-3">
+                        <h4 class="text-center"><strong>Most Complained</strong></h4>
+                        <div class="col-md-6">
+                            <div class="card text-center">
+                                <div class="card-header bg-outline-success text-success">
+                                    <h4><strong>Section</strong></h4>
+                                    <h3><strong><?php echo htmlspecialchars($most_complained_section); ?></strong></h3>
+                                    <p><strong><?php echo $most_complained_section_count; ?></strong> Complaints</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card text-center">
+                                <div class="card-header bg-outline-success text-success">
+                                    <h4><strong>Grade</strong></h4>
+                                    <h3><strong><?php echo htmlspecialchars($most_complained_grade); ?></strong></h3>
+                                    <p><strong><?php echo $most_complained_grade_count; ?></strong> Complaints</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-    <div class="w3-container">
-        <!-- Dashboard Heading -->
-        <h3 class="text-center mb-4">Dashboard Overview</h3>
-        <div class="row ">
-            <!-- Reservations Overview -->
-            <div class="card mb-4 dashboard-card">
-                <div class="card-header">
-                    <h5 class="card-title">Reservations</h5>
-                </div>
-                <div class="card-body">
-                    <table class="table table-bordered">
-                        <thead>
-                            <tr>
-                                <th>Table</th>
-                                <th>Reservation Date</th>
-                                <th>Reservation Time</th>
-                                <th>Duration</th>
-                                <th>Total Price</th>
-                                <th>Status</th>
-                                <th>Payment Method</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php while ($row = mysqli_fetch_assoc($reservationsResult)): ?>
-                                <tr>
-                                    <td><?php echo $row['table_id']; ?></td>
-                                    <td><?php echo $row['reservation_date']; ?></td>
-                                    <td><?php echo $row['reservation_time']; ?></td>
-                                    <td><?php echo $row['duration']; ?> hours</td>
-                                    <td><?php echo number_format($row['total_price'], 2); ?> USD</td>
-                                    <td><?php echo $row['status']; ?></td>
-                                    <td><?php echo $row['payment_method']; ?></td>
-                                </tr>
-                            <?php endwhile; ?>
-                        </tbody>
-                    </table>
                 </div>
             </div>
-        </div>
-        <div class="row">
-            <div class="col-md-4">
-                <!-- Tables Overview -->
-                <div class="card mb-4 dashboard-card">
-                    <div class="card-header">
-                        <h5 class="card-title">Tables</h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Table ID</th>
-                                    <th>Table Name</th>
-                                    <th>Seats</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php while ($row = mysqli_fetch_assoc($tablesResult)): ?>
-                                    <tr>
-                                        <td><?php echo $row['id']; ?></td>
-                                        <td><?php echo $row['table_name']; ?></td>
-                                        <td><?php echo $row['seats']; ?></td>
-                                    </tr>
-                                <?php endwhile; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <!-- Menu Items Overview -->
-                <div class="card mb-4 dashboard-card">
-                    <div class="card-header">
-                        <h5 class="card-title">Menu Items</h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-bordered">
-                            <thead>
-                                <tr>
-                                    <th style="width:30%;">Name</th>
-                                    <th style="width:70%;">Image</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php while ($row = mysqli_fetch_assoc($menuItemsResult)): ?>
-                                    <tr>
-                                        <td><?php echo $row['name']; ?></td>
-                                        <td><img class="menu-img" src="<?php echo $row['image']; ?>" alt="<?php echo $row['name']; ?>"></td>
-                                    </tr>
-                                <?php endwhile; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <!-- Bundles Overview -->
-                <div class="card mb-4 dashboard-card">
-                    <div class="card-header">
-                        <h5 class="card-title">Bundles</h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-bordered">
-                            <thead>
-                                <tr>
-                                    <th>Bundle ID</th>
-                                    <th>Bundle Name</th>
-                                    <th>Price</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php while ($row = mysqli_fetch_assoc($bundlesResult)): ?>
-                                    <tr>
-                                        <td><?php echo $row['id']; ?></td>
-                                        <td><?php echo $row['name']; ?></td>
-                                        <td><?php echo number_format($row['price'], 2); ?> USD</td>
-                                    </tr>
-                                <?php endwhile; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+
         </div>
     </div>
 </div>
 
-<?php include 'footer.php'; ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Prepare data for the chart (Violations)
+    const violationLabels = <?php echo json_encode(array_column($violations_data, 'violation_description')); ?>;
+    const violationData = <?php echo json_encode(array_column($violations_data, 'count')); ?>;
 
-<style>
-    #main {
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
+    // Create the bar chart
+    const ctx = document.getElementById('violationsChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: violationLabels,
+            datasets: [{
+                label: 'Total Violation',
+                data: violationData,
+                backgroundColor: 'rgba(75, 192, 192, 0.5)', // Light green
+                borderColor: 'rgba(75, 192, 192, 1)', // Darker green
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Violation Type' // Label for the X-axis
+                    }
+                },
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of commits' // Label for the Y-axis
+                    },
+                    ticks: {
+                        stepSize: 1 // Set the Y-axis to increment by 1
+                    }
+                }
+            }
+        }
+    });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.2/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+
+
+
+<script>
+    function w3_open() {
+        document.getElementById("main").style.marginLeft = "25%";
+        document.getElementById("mySidebar").style.width = "25%";
+        document.getElementById("mySidebar").style.display = "block";
+        document.getElementById("openNav").style.display = 'none';
     }
 
-    .dashboard-card {
-        max-height: 300px; /* Set a max height for the cards */
-        overflow-y: auto; /* Make the card content scrollable */
+    function w3_close() {
+        document.getElementById("main").style.marginLeft = "0%";
+        document.getElementById("mySidebar").style.display = "none";
+        document.getElementById("openNav").style.display = "inline-block";
     }
-</style>
-
+</script>
+<!-- Add JavaScript to trigger the toast -->
+<script>
+    document.getElementById("liveToastBtn").addEventListener("click", function() {
+        var toast = new bootstrap.Toast(document.getElementById("liveToast"));
+        toast.show();
+    });
+</script>

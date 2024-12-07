@@ -1,166 +1,86 @@
-<?php 
-include 'head.php'; 
-include 'navbar.php'; 
-include 'conn.php';  // Database connection
+<?php
+session_start();
 
-// Get the current day of the week
-$currentDay = strtolower(date("l")); // Get the current day and convert to lowercase
+include "head.php";
+include "conn.php";
 
-// Fetch operation hours from the database for the current day
-$sql = "SELECT * FROM operation_hours WHERE day = '$currentDay'";
-$result = $conn->query($sql);
-$hours = $result->fetch_assoc();
+$username = '';
+$password = '';
 
-// Fetch menu_items items from the database
-$menu_itemsSql = "SELECT * FROM menu_items";
-$menu_itemsResult = $conn->query($menu_itemsSql);
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Get the username and password from the form
+    $username = trim($_POST['username']);
+    $password = trim($_POST['password']);
 
-// Fetch bundles from the database
-$bundleSql = "SELECT * FROM bundles";
-$bundleResult = $conn->query($bundleSql);
+    // Validate inputs
+    if (!empty($username) && !empty($password)) {
+        // Query the admin table to check for the username and password
+        $sql = "SELECT * FROM admin WHERE username = ? AND password = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param('ss', $username, $password);
 
-// Function to convert 24-hour time to 12-hour AM/PM format
-function convertTo12HourFormat($time24) {
-    // Strip seconds if present
-    $time24 = substr($time24, 0, 5);  // Extract only HH:mm part
-    $date = DateTime::createFromFormat('H:i', $time24);
+        if ($stmt->execute()) {
+            $result = $stmt->get_result();
+            // Check if a matching record was found
+            if ($result->num_rows === 1) {
+                $admin = $result->fetch_assoc();
 
-    // Check if the date object was created successfully
-    if ($date === false) {
-        return 'Click edit to set time.';  // Return a default value if the time format is incorrect
+                // Set session variables for the logged-in admin
+                $_SESSION['admin_logged_in'] = true;
+                $_SESSION['admin_id'] = $admin['id'];
+                $_SESSION['admin_name'] = $admin['name'];
+
+                // Redirect to the admin dashboard
+                header("Location: dashboard.php");
+                exit;
+            } else {
+                // Invalid credentials: Set toast message
+                $toast_message = "Invalid username or password.";
+                $toast_class = "Failed";
+            }
+        } else {
+            // Query failed: Set toast message
+            $toast_message = "Something went wrong while logging in.";
+            $toast_class = "Failed";
+        }
+    } else {
+        // Missing fields: Set toast message
+        $toast_message = "Please fill in both fields.";
+        $toast_class = "Failed";
     }
-
-    return $date->format('g:i A');  // 12-hour format with AM/PM
 }
 ?>
 
-<!-- Home Section -->
-<div id="home" class="container text-center" style="margin-top: 15%;">
-    <h1 class="display-4 mb-3 font-weight-bold">Welcome to Samgyeop Saranghae!</h1>
-    <p class="lead mb-4">Experience the best Korean BBQ with a touch of love.</p>
-    <a href="reserve.php" class="btn btn-secondary btn-lg">Reserve Now</a>
-</div>
-
-<!-- Opening Hours Section (only for the current day) -->
-<div id="hours" class="container py-5" style="margin-bottom:15%;">
-    <?php
-    // Check if the hours are available
-    if ($hours && $hours['opening_hour'] && $hours['closing_hour']) {
-        // Convert opening and closing hours to 12-hour format
-        $opening_hour_12 = convertTo12HourFormat($hours['opening_hour']);
-        $closing_hour_12 = convertTo12HourFormat($hours['closing_hour']);
-    ?>
-        <h2 class="text-center">
-            <strong>We are open today, <?php echo ucfirst($currentDay); ?>, </strong>
-            <span style="color: red;">from <?php echo $opening_hour_12; ?> to <?php echo $closing_hour_12; ?></span>.
-        </h2>
-    <?php } else { ?>
-        <p class="text-center text-danger" style="font-size: 24px;">
-            <strong>We are closed today.</strong>
-        </p>
-    <?php } ?>
-</div>
-
-<!-- Menu Items Section -->
-<div id="menu" class="container py-5">
-    <h2 class="text-center mb-4">Our Menu</h2>
-    <div class="row">
-        <?php
-        if ($menu_itemsResult->num_rows > 0) {
-            while ($row = $menu_itemsResult->fetch_assoc()) {
-                
-                echo "
-                <div class='col-md-3 mb-4'>
-                    <div class='card'>
-                        <div class='card-img-container'>
-                            <img src='{$row['image']}' class='card-img-top' alt='{$row['name']}'>
-                        </div>
-                        <div class='card-body'>
-                            <h5 class='card-title font-weight-bold'>{$row['name']}</h5>
-                            <p class='card-text-1 description'>{$row['description']}</p>
-                        </div>
-                    </div>
-                </div>";
-            }
-        } else {
-            echo "<p class='text-center'>No menu items available.</p>";
-        }
-        ?>
+<div id="main" class="vh-100 d-flex justify-content-center align-items-center position-relative">
+    <!-- Light Yellow Background -->
+    <div class="position-absolute top-0 start-0 w-100 h-100" style="background: rgba(255, 255, 224, 0.5); z-index: 0;"></div>
+    
+    <!-- Login Card -->
+    <div class="card shadow-lg position-relative" style="width: 100%; max-width: 500px; z-index: 1;">
+        <!-- Header Section -->
+        <div class="card-header bg-white text-success text-center">
+            <img src="img/gcims_logo.png" alt="Logo" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover;">
+            <h4 class="fw-bold mt-2">GCIMS</h4>
+            <p class="mb-0">Guidance and Counseling Information Management System</p>
+        </div>
+        <!-- Login Form -->
+        <div class="card-body">
+            <form method="POST" action="">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" name="username" id="username" class="form-control" placeholder="Enter your username" value="<?php echo htmlspecialchars($username); ?>">
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" name="password" id="password" class="form-control" placeholder="Enter your password">
+                </div>
+                <button type="submit" class="btn btn-success w-100">Login</button>
+            </form>
+        </div>
     </div>
 </div>
 
-<!-- Bundles Section -->
-<div id="bundles" class="container py-5">
-    <h2 class="text-center mb-4">Our Bundles</h2>
-    <div class="row">
-        <?php
-        if ($bundleResult->num_rows > 0) {
-            while ($row = $bundleResult->fetch_assoc()) {
-                // Fetch associated items from the bundle_items table
-                $bundleItemsSql = "SELECT m.name FROM bundle_items bi 
-                                   JOIN menu_items m ON bi.item_id = m.id 
-                                   WHERE bi.bundle_id = {$row['id']}";
-                $bundleItemsResult = $conn->query($bundleItemsSql);
-                $bundleItems = [];
-                while ($item = $bundleItemsResult->fetch_assoc()) {
-                    $bundleItems[] = $item['name'];
-                }
-                $bundleItemsList = implode(", ", $bundleItems); // List of items for the bundle
-                
-                echo "
-                <div class='col-md-4 mb-4'>
-                    <div class='card'>
-                        <div class='card-body'>
-                            <h5 class='card-title'>{$row['name']}</h5>
-                            <p class='card-text'>Price: ₱{$row['price']}</p>
-                            <p><strong>Items Included:</strong> {$bundleItemsList}</p>
-                        </div>
-                    </div>
-                </div>";
-            }
-        } else {
-            echo "<p class='text-center'>No bundles available.</p>";
-        }
-        ?>
-    </div>
-</div>
-
-<!-- Reservation Section -->
-<div id="reservation" class="container py-5">
-    <h2 class="text-center mb-4">Available Tables for Reservation</h2>
-    <table class="table table-bordered table-striped text-center">
-        <thead>
-            <tr>
-                <th>Table Number</th>
-                <th>Seats</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- For now, mock up some tables -->
-            <tr>
-                <td>1</td>
-                <td>4</td>
-                <td>Available</td>
-            </tr>
-            <tr>
-                <td>2</td>
-                <td>2</td>
-                <td>Available</td>
-            </tr>
-            <tr>
-                <td>3</td>
-                <td>6</td>
-                <td>Reserved</td>
-            </tr>
-            <tr>
-                <td>4</td>
-                <td>4</td>
-                <td>Available</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-
-<?php include 'footer.php'; ?>
-
+<?php
+include "toast.php";
+include "footer.php";
+?>
