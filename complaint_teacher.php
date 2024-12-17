@@ -48,32 +48,13 @@ if (isset($_SESSION['toast_message']) && isset($_SESSION['toast_class'])) {
         </div>
 
         <!-- Complaints Table -->
+
         <table class="table table-hover table-bordered mt-2 text-center">
             <thead>
                 <tr>
-                <table class="table table-hover table-bordered mt-2 text-center">
-    <thead>
-        <tr>
-            <th style="width: 55%;">Complained Person</th>
-            <th style="width: 30%;">Position</th>
-            <th class="text-center" style="width: 15%;">Actions</th>
-        </tr>
-    </thead>
-    <tbody id="tableBody">
-        <?php while ($row = $result->fetch_assoc()) { ?>
-            <tr>
-                <td><?php echo ucwords($row['complainedFirstName']) . ' ' . ucwords($row['complainedLastName']); ?></td>
-                <td><?php echo ucwords($row['complainedDesignation']); ?></td>
-                <td>
-                    <a href="pending_sp.php?id=<?php echo $row['id']; ?>" class="btn btn-outline-success">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                </td>
-            </tr>
-        <?php } ?>
-    </tbody>
-</table>
-
+                    <th style="width: 55%;">Complained Person</th>
+                    <th style="width: 30%;">Position</th>
+                    <th class="text-center" style="width: 15%;">Actions</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
@@ -90,8 +71,24 @@ if (isset($_SESSION['toast_message']) && isset($_SESSION['toast_class'])) {
                 <?php } ?>
             </tbody>
         </table>
+
+        </tr>
+        </thead>
+        <tbody id="tableBody">
+            <?php while ($row = $result->fetch_assoc()) { ?>
+                <tr>
+                    <td><?php echo ucwords($row['complainedFirstName']) . ' ' . ucwords($row['complainedLastName']); ?></td>
+                    <td><?php echo ucwords($row['complainedDesignation']); ?></td>
+                    <td>
+                        <a href="pending_sp.php?id=<?php echo $row['id']; ?>" class="btn btn-outline-success">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+            <?php } ?>
+        </tbody>
+        </table>
     </div>
-</div>
 </div>
 
 <script>

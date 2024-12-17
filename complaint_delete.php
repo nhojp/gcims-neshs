@@ -8,7 +8,7 @@ if (isset($_GET['delete_id'])) {
     $complaint_id = $_GET['delete_id'];
 
     // Prepare the DELETE query to remove the record from the database
-    $query = "DELETE FROM complaints WHERE id = ?";
+    $query = "DELETE FROM complaints_student WHERE id = ?";
     $stmt = $conn->prepare($query);
     $stmt->bind_param("i", $complaint_id);  // 'i' is for integer (id)
     
@@ -19,7 +19,7 @@ if (isset($_GET['delete_id'])) {
         $_SESSION['toast_class'] = "success";  // Bootstrap success class
 
         // Redirect after deletion to avoid resubmission
-        header("Location: complaint_teacher.php");  // Adjust to your page
+        header("Location: complaint_student.php");  // Adjust to your page
         exit();
     } else {
         // Set the error toast message
@@ -27,7 +27,7 @@ if (isset($_GET['delete_id'])) {
         $_SESSION['toast_class'] = "danger";  // Bootstrap danger class
 
         // Redirect after failure
-        header("Location: complaint_teacher.php");  // Adjust to your page
+        header("Location: complaint_student.php");  // Adjust to your page
         exit();
     }
 }

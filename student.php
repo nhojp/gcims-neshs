@@ -566,7 +566,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="modal-content">
             <div class="modal-header text-white bg-success">
                 <h5 class="modal-title" id="addStudentModalLabel">Add Student</h5>
-                <button type="button" class="btn-danger btn btn btn-circle" data-dismiss="modal" aria-label="Close">
+                <button type="button" class="btn btn-danger" data-dismiss="modal" aria-label="Close">
                     <span>&times;</span>
                 </button>
             </div>

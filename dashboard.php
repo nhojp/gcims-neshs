@@ -80,7 +80,7 @@ $conn->close();
 ?>
 <div id="main">
     <?php include "header.php"; ?>
-    
+
     <div class="container-fluid">
         <div class="container-fluid bg-white mt-2 rounded-lg border">
             <div class="row pt-3">
@@ -177,8 +177,9 @@ $conn->close();
             datasets: [{
                 label: 'Total Violation',
                 data: violationData,
-                backgroundColor: 'rgba(75, 192, 192, 0.5)', // Light green
-                borderColor: 'rgba(75, 192, 192, 1)', // Darker green
+                backgroundColor: 'rgba(0, 128, 0, 0.5)', // Light green
+                borderColor: 'rgba(0, 128, 0, 1)', // Darker green
+
                 borderWidth: 1
             }]
         },
